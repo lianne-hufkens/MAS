@@ -12,7 +12,7 @@ class VotingScheme(Enum):
     anti_plurality = 3
     borda = 4
 
-useGeneratedVoters = True
+useGeneratedVoters = False
 
 votingScheme = None
 #options
@@ -25,7 +25,6 @@ voting_results = None
 voters = None
 voter_happiness = None
 tactical_voting_options = []
-
 
 def inputVoters():
     global voters, m, n
@@ -75,6 +74,7 @@ def inputScheme():
         scheme = 1
     print("Using voting scheme "+VotingScheme(int(scheme)).name)
     setVotingScheme(VotingScheme(int(scheme)))
+    print()
 
 def inputSettings():
     global m, n
@@ -88,7 +88,6 @@ def inputSettings():
         print("n has defaulted to 5.")
         n = 5
     n = int(n)
-    
 
 def generateVoters():
     global m, n, voters
@@ -158,6 +157,7 @@ def findDeceptions(voterList):
     global voters, voting_results, voter_happiness
     sorted_voting_result = getSortedVotingResult(voting_results)
     deceptions = []
+    count = 0
     for voter in voterList:
         voterPreference = voters[voter,:]
         happiness = voter_happiness[voter]
@@ -167,10 +167,6 @@ def findDeceptions(voterList):
             rankFavorite = m - happiness
             pointsFavorite = sorted_voting_result[rankFavorite-1][1]
             pointsWinner = sorted_voting_result[0][1]
-            pointDifference = pointsWinner - pointsFavorite
-            #if favorite has a higher id, one more point is needed to catch up
-            if favorite > winner:
-                pointDifference += 1
             #(v,Õ,~H,z)
             for newPreference in itertools.permutations(voterPreference):
                 newResults = countVotesWithDeception(voter, newPreference)
@@ -179,9 +175,10 @@ def findDeceptions(voterList):
                 
                 if newHappiness > happiness:
                     newVoters = getVotersWithDeception(voter, newPreference)
-                    deceptions.append((voter, newPreference, newResults,
+                    deceptions.append((count, voter, newPreference, newResults,
                                        np.sum(calculateAllHappiness(m, getVotersWithDeception(voter, newPreference), newResults)),
                                        identifyDeception(voterPreference, newPreference, winner, newWinner)))
+                    count += 1
     return deceptions
 
 def printVoterPreferences(voters):    
@@ -198,11 +195,32 @@ def printResults(voting_results):
 
 def printDeceptions(deceptions):
     if len(deceptions) > 0:
-        headers=['Voter', 'Tactical preference', 'New voting outcome', 'New happiness', 'Tactic']
-        print(tabulate(deceptions, headers))
+        headers=['ID','Voter', 'Tactical preference', 'New voting outcome', 'New happiness', 'Tactic']
+        print(tabulate(deceptions, headers, numalign="center"))
         print()
 
-
+def printScenario(scene):
+    global voting_results, m, voters, voter_happiness
+    voter = scene[1]
+    print()
+    print("Showing scenario "+str(scene[0])+" in detail:")
+    SVR = getSortedVotingResult(voting_results)
+    SSR = getSortedVotingResult(scene[3])
+    print()
+    headers = ["Candidate", r"Original Score", "Candidate", "New Score"]
+    merged_list = [(SVR[i][0], SVR[i][1], SSR[i][0], SSR[i][1]) for i in range(m)]
+    print(tabulate(merged_list, headers, numalign="center"))
+    orgVoterPref = copy.deepcopy(voters[voter].tolist())
+    newVoterPref = np.array(copy.deepcopy(scene[2]))
+    print()
+    headers = ["True preference", "Tactical preference"]
+    merged_pref = [(orgVoterPref[j], newVoterPref[j]) for j in range(m)]
+    print(tabulate(merged_pref, headers, numalign="center"))
+    print()
+    print("Overall happiness went up from "+str(np.sum(voter_happiness))+" to "+str(scene[4])+".")
+    print("Voter #"+str(voter)+" used "+str(scene[5])+" for this result.")
+    print()
+    
 def calculateTacticalRisk(tactical_voting_options):
     global n
     return len(tactical_voting_options)/n
@@ -238,6 +256,15 @@ while run:
             print("There are no voting manipulation tactics possible in this situation.")
         
     print("The overall risk for tactical voting is "+str(calculateTacticalRisk(tactical_voting_options)))
-    scenario = input("\nRun another scenario(y/n)?")
+    
+    loop = (len(tactical_voting_options) > 0)
+    while loop:
+        scene = input("\nShow details of a scenario with tactical voting('no' to decline): ")
+        if scene == "" or scene.lower() == "n" or scene.lower() == "no":
+            loop = False
+        elif int(scene) >= 0 and int(scene) < len(tactical_voting_options):
+            printScenario(tactical_voting_options[int(scene)])
+
+    scenario = input("\nRun another voting scenario(y/n)?")
     if scenario != "" and scenario.lower() != "y" and scenario.lower() != "yes":
         run = False
