@@ -26,6 +26,7 @@ voters = None
 voter_happiness = None
 tactical_voting_options = []
 
+
 def inputVoters():
     global voters, m, n
     print("Set the voter preferences. Candidates are numbered 1,2,3,... etc.")
@@ -126,6 +127,26 @@ def getVotersWithDeception(voter, deceptivePreference):
 def getSortedVotingResult(voting_results):
     return sorted(voting_results.items(), key=lambda kv: (-kv[1], kv[0]))
 
+def rankingHasChangedPositive(new_results, true_preference):
+    global voting_results
+    true_preference = copy.deepcopy(true_preference).tolist()
+    true_winner = getWinner(voting_results)
+    oldRanking = [c for (c,p) in getSortedVotingResult(voting_results)]
+    newRanking = [d for (d,q) in getSortedVotingResult(new_results)]
+    #print("Old:"+str(oldRanking)+" New:"+str(newRanking))
+    true_winner_index = true_preference.index(true_winner)
+    if (oldRanking != newRanking):
+        for i in range(true_winner_index):
+            #print("Index count: "+str(i)+" at "+str(true_preference))
+            candidate = true_preference[i]
+            oldIndex = oldRanking.index(candidate)
+            newIndex = newRanking.index(candidate)
+            if newIndex < oldIndex:
+                #print("C:"+str(candidate)+" Old:"+str(oldIndex)+" New:"+str(newIndex))
+                return True
+        return False
+
+
 def getWinner(voting_results):
     return max(voting_results, key=voting_results.get)
 
@@ -134,11 +155,14 @@ def calculateHappiness(m, voterPreference, winner):
 
 def calculateAllHappiness(m, voters, voting_results):
     winner = getWinner(voting_results)
-    return np.array([calculateHappiness(m, v, winner) for v in voters])
+    return np.array([[calculateHappiness(m, v, winner) for v in voters]])
+
+def calculateOverallHappiness(m, voters, voting_results):
+    return np.sum(calculateAllHappiness(m, voters, voting_results))
 
 def getUnhappyVoters():
     global voter_happiness, m
-    return [i for (i,v) in enumerate(voter_happiness) if v < m-1]
+    return [i for (i,v) in enumerate(voter_happiness[0]) if v < m-1]
 
 def identifyDeception(truePreference, newPreference, trueWinner, newWinner):
     trueWinIndex = list(truePreference).index(trueWinner)
@@ -154,29 +178,28 @@ def identifyDeception(truePreference, newPreference, trueWinner, newWinner):
         return None
 
 def findDeceptions(voterList):
-    global voters, voting_results, voter_happiness
+    global voters, voting_results, voter_happiness, m
     sorted_voting_result = getSortedVotingResult(voting_results)
     deceptions = []
     count = 0
     for voter in voterList:
         voterPreference = voters[voter,:]
-        happiness = voter_happiness[voter]
+        happiness = voter_happiness[0][voter] #happiness of this voter
+        overallHappiness = np.sum(voter_happiness)
         favorite = voterPreference[0]
         winner = getWinner(voting_results)    
         if favorite is not winner:
             rankFavorite = m - happiness
-            pointsFavorite = sorted_voting_result[rankFavorite-1][1]
-            pointsWinner = sorted_voting_result[0][1]
             #(v,Õ,~H,z)
             for newPreference in itertools.permutations(voterPreference):
                 newResults = countVotesWithDeception(voter, newPreference)
                 newWinner = getWinner(newResults)
                 newHappiness = calculateHappiness(m, voterPreference, newWinner)
-                
-                if newHappiness > happiness:
+                newOverallHappiness = calculateOverallHappiness(m, getVotersWithDeception(voter, newPreference), newResults)
+
+                if newOverallHappiness > overallHappiness and newHappiness >= happiness and rankingHasChangedPositive(newResults, voterPreference):
                     newVoters = getVotersWithDeception(voter, newPreference)
-                    deceptions.append((count, voter, newPreference, newResults,
-                                       np.sum(calculateAllHappiness(m, getVotersWithDeception(voter, newPreference), newResults)),
+                    deceptions.append((count, voter, newPreference, newResults, newOverallHappiness,
                                        identifyDeception(voterPreference, newPreference, winner, newWinner)))
                     count += 1
     return deceptions
@@ -200,22 +223,24 @@ def printDeceptions(deceptions):
         print()
 
 def printScenario(scene):
-    global voting_results, m, voters, voter_happiness
+    global voting_results, m, voters, voter_happiness, n
     voter = scene[1]
     print()
     print("Showing scenario "+str(scene[0])+" in detail:")
     SVR = getSortedVotingResult(voting_results)
     SSR = getSortedVotingResult(scene[3])
-    print()
-    headers = ["Candidate", r"Original Score", "Candidate", "New Score"]
-    merged_list = [(SVR[i][0], SVR[i][1], SSR[i][0], SSR[i][1]) for i in range(m)]
-    print(tabulate(merged_list, headers, numalign="center"))
     orgVoterPref = copy.deepcopy(voters[voter].tolist())
     newVoterPref = np.array(copy.deepcopy(scene[2]))
     print()
-    headers = ["True preference", "Tactical preference"]
-    merged_pref = [(orgVoterPref[j], newVoterPref[j]) for j in range(m)]
-    print(tabulate(merged_pref, headers, numalign="center"))
+    headers = ["Candidate", "Original Score", "Candidate", "New Score", "True preference", "Tactical preference"]
+    merged_list = [(SVR[i][0], SVR[i][1], SSR[i][0], SSR[i][1], orgVoterPref[i], newVoterPref[i]) for i in range(m)]
+    print(tabulate(merged_list, headers, numalign="center"))
+    print()
+    print("Happiness changes:")
+    headers = ["Voter #","Old", "New"]
+    new_happiness = calculateAllHappiness(m, getVotersWithDeception(voter, newVoterPref), scene[3])
+    zh = zip([i for i in range(n)], copy.deepcopy(voter_happiness).T, new_happiness.T)
+    print(tabulate(zh, headers, numalign="center"))
     print()
     print("Overall happiness went up from "+str(np.sum(voter_happiness))+" to "+str(scene[4])+".")
     print("Voter #"+str(voter)+" used "+str(scene[5])+" for this result.")
