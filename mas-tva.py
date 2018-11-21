@@ -15,10 +15,8 @@ class VotingScheme(Enum):
 useGeneratedVoters = False
 
 votingScheme = None
-#options
-m = 5
-#voters
-n = 7
+m = 5 #options
+n = 7 #voters
 
 votingVector = None
 voting_results = None
@@ -31,7 +29,7 @@ def inputVoters():
     global voters, m, n
     print("Set the voter preferences. Candidates are numbered 1,2,3,... etc.")
     print("Please ensure that all numbers occur only once per voter preference.")
-    print("The format is 'x y ... z'. Spaces go beween numbers.")
+    print("The format is 'x y ... z'. Spaces go between numbers. 1 should be the lowest number.")
     print("Once the first voter preference is set, all following preferences must use the same number of candidates.")
     print("Press enter on an empty field to finish.")
     votersRun = True
@@ -133,18 +131,15 @@ def rankingHasChangedPositive(new_results, true_preference):
     true_winner = getWinner(voting_results)
     oldRanking = [c for (c,p) in getSortedVotingResult(voting_results)]
     newRanking = [d for (d,q) in getSortedVotingResult(new_results)]
-    #print("Old:"+str(oldRanking)+" New:"+str(newRanking))
     true_winner_index = true_preference.index(true_winner)
     if (oldRanking != newRanking):
         for i in range(true_winner_index):
-            #print("Index count: "+str(i)+" at "+str(true_preference))
             candidate = true_preference[i]
             oldIndex = oldRanking.index(candidate)
             newIndex = newRanking.index(candidate)
             if newIndex < oldIndex:
-                #print("C:"+str(candidate)+" Old:"+str(oldIndex)+" New:"+str(newIndex))
                 return True
-        return False
+    return False
 
 
 def getWinner(voting_results):
