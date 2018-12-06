@@ -1,0 +1,32 @@
+#Number of item types M
+#Number of sellers K
+#Number of buyers N
+#Number of auction rounds R
+#Universal maximum starting price Smax
+#Penalty factor E
+#Indication whether “pure” of leveled commitment auctioning is used PureCommitment
+#other...
+
+class Buyer:
+    bidFactor = None
+    def bid(self, startPrice):
+        return bidFactor * startPrice
+
+class Seller:
+    itemType = None
+    def setStartingPrice(self):
+        return random.randint(0,10)
+    def setItemType(self):
+        global M
+        self.itemType = random.randint(0,M)
+
+def askInput(message):
+    while True:
+        a = input(message)
+        if int(a) > 0:
+            return int(a)   
+
+M = askInput("How many item types? ")
+K = askInput("How many sellers? ")
+N = askInput("How many buyers? ")
+R = askInput("How many auction rounds? ")
