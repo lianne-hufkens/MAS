@@ -1,3 +1,6 @@
+import random
+from tabulate import tabulate
+
 #Number of item types M
 #Number of sellers K
 #Number of buyers N
@@ -7,26 +10,117 @@
 #Indication whether “pure” of leveled commitment auctioning is used PureCommitment
 #other...
 
+roundCount = 1
+auctionCount = 1
+
 class Buyer:
-    bidFactor = None
-    def bid(self, startPrice):
-        return bidFactor * startPrice
+    bidFactors = None
+    bid = None
+    lastWin = None
+    def __init__(self, ID):
+        self.ID = ID
+        self.bidFactors = [random.uniform(1,5) for t in range(M)]
+    def setBid(self, startPrice, itemType):
+        self.bid = self.bidFactors[itemType] * startPrice
 
 class Seller:
     itemType = None
+    startPrice = None
+    def __init__(self, ID):
+        self.ID = ID
     def setStartingPrice(self):
-        return random.randint(0,10)
+        self.startPrice = random.randint(1, Smax) #maybe turn this into float?
     def setItemType(self):
         global M
-        self.itemType = random.randint(0,M)
+        self.itemType = random.randint(0, M-1)
 
-def askInput(message):
+def askInput(message, compare=None):
+    if compare is None:
+        compare = 0
     while True:
         a = input(message)
-        if int(a) > 0:
-            return int(a)   
+        if a is not "":
+            if int(a) > compare:
+                return int(a)
+
+def createAllObjects():
+    global buyers, sellers
+    buyers = [Buyer(b) for b in range(N)]
+    sellers = [Seller(s) for s in range(K)]
+
+def sortBidders(bidders):
+    return sorted(bidders, key=lambda x: x.bid, reverse=True)
+    
+def getWinnerAndPrice(bidders, marketPrice):
+    biddersLeft = [b for b in bidders if b.bid < marketPrice]
+    biddersLeft = sortBidders(biddersLeft)
+    if len(biddersLeft) > 1:
+        return biddersLeft[0], biddersLeft[1].bid
+    elif len(biddersLeft) == 1:
+        return biddersLeft[0], biddersLeft[0].bid
+    else:
+        return None, None
+
+def runAllRounds():
+    for r in range(R):
+        runRound()
+
+def runRound():
+    global buyers, sellers, roundCount, auctionCount
+    for s in sellers:
+        s.setItemType()
+    roundOrder = [n for n in range(len(sellers))]
+    random.shuffle(roundOrder)
+    participatingBuyers = [b for b in buyers]
+    for o in roundOrder:
+        participatingBuyers = runAuction(sellers[o], participatingBuyers)
+    auctionCount = 1
+    roundCount += 1
+
+def runAuction(seller, bidders):
+    global auctionCount
+    if len(bidders) > 1:
+        win = False
+        seller.setStartingPrice()
+        for b in buyers:
+            b.setBid(seller.startPrice, seller.itemType)
+        marketPrice = sum(b.bid for b in bidders) / len(bidders)
+        winner, winPrice = getWinnerAndPrice(bidders, marketPrice)
+        if winner is not None:
+            winner.lastWin = winPrice
+            win = True            
+        printAuctionResults(bidders, seller, marketPrice, win)
+        auctionCount += 1
+        if win:
+            return [b for b in bidders if b is not winner]
+        else:
+            return bidders
+
+def printAuctionResults(bidders, seller, marketPrice, win):
+    s1 = "Round {} auction {}".format(roundCount, auctionCount)
+    s2 = "Seller {} auctioned item type {} with starting price {}".format(seller.ID, seller.itemType, seller.startPrice)
+    bidders = sortBidders(bidders)
+    bids = [b.bid for b in bidders]
+    bids.append(marketPrice)
+    bids.sort(reverse=True)
+    mpIndex = bids.index(marketPrice)
+    biddersID = [b.ID for b in bidders]
+    biddersID.insert(mpIndex, "Market Price")
+    data = [biddersID, bids]
+    data = list(map(list, zip(*data)))#transpose list of lists
+    print()
+    print(s1)
+    print(s2)
+    print(tabulate(data, headers=['Buyer #', 'Bid value'], tablefmt="fancy_grid", stralign="center"))
+    if not win:
+        print("This auction had no winner.")
+        
+
 
 M = askInput("How many item types? ")
 K = askInput("How many sellers? ")
-N = askInput("How many buyers? ")
+N = askInput("How many buyers? ", K)
 R = askInput("How many auction rounds? ")
+Smax = askInput("What is the universal maximum starting price? ")
+createAllObjects()
+runAllRounds()
