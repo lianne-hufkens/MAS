@@ -19,13 +19,14 @@ class Buyer:
     lastWin = None
     def __init__(self, ID):
         self.ID = ID
-        self.bidFactors = [random.uniform(1,5) for t in range(M)]
+        self.bidFactors = [random.uniform(1,5) for t in range(M)] #a seperate factor for each item type
     def setBid(self, startPrice, itemType):
         self.bid = self.bidFactors[itemType] * startPrice
 
 class Seller:
     itemType = None
     startPrice = None
+    lastWin = None
     def __init__(self, ID):
         self.ID = ID
     def setStartingPrice(self):
@@ -34,16 +35,29 @@ class Seller:
         global M
         self.itemType = random.randint(0, M-1)
 
-def askInput(message, compare=None):
-    if compare is None:
-        compare = 0
+
+def askInput(message, lowBound=None, highBound=None):
+    if lowBound is None:
+        lowBound = 0
+    if highBound is None:
+        highBound = 100
     while True:
         a = input(message)
         if a is not "":
-            if int(a) > compare:
+            if a.isdigit() and int(a) > lowBound and int(a) <= highBound:
                 return int(a)
+            
+def askBool(message):
+    while True:
+        a = input(message)
+        if a is not "":
+            if a.lower() in ["y", "yes", "t", "tr", "true", "1"]:
+                return True
+            else:
+                return False
 
-def createAllObjects():
+
+def createAllObjects(): #create all buyers and sellers
     global buyers, sellers
     buyers = [Buyer(b) for b in range(N)]
     sellers = [Seller(s) for s in range(K)]
@@ -51,7 +65,7 @@ def createAllObjects():
 def sortBidders(bidders):
     return sorted(bidders, key=lambda x: x.bid, reverse=True)
     
-def getWinnerAndPrice(bidders, marketPrice):
+def getWinnerAndPrice(bidders, marketPrice): #get the winning bidder and the price they must pay
     biddersLeft = [b for b in bidders if b.bid < marketPrice]
     biddersLeft = sortBidders(biddersLeft)
     if len(biddersLeft) > 1:
@@ -68,31 +82,32 @@ def runAllRounds():
 def runRound():
     global buyers, sellers, roundCount, auctionCount
     for s in sellers:
-        s.setItemType()
-    roundOrder = [n for n in range(len(sellers))]
-    random.shuffle(roundOrder)
-    participatingBuyers = [b for b in buyers]
+        s.setItemType() #sellers pick their item type
+    roundOrder = [n for n in range(len(sellers))] 
+    random.shuffle(roundOrder) #to get the turn order for the sellers
+    participatingBuyers = [b for b in buyers] #all buyers participate at first
     for o in roundOrder:
-        participatingBuyers = runAuction(sellers[o], participatingBuyers)
+         participatingBuyers = runAuction(sellers[o], participatingBuyers) #run an auction
     auctionCount = 1
     roundCount += 1
 
 def runAuction(seller, bidders):
     global auctionCount
-    if len(bidders) > 1:
+    if len(bidders) > 1: #at least two bidders are present
         win = False
-        seller.setStartingPrice()
+        seller.setStartingPrice() #set starting price
         for b in buyers:
-            b.setBid(seller.startPrice, seller.itemType)
-        marketPrice = sum(b.bid for b in bidders) / len(bidders)
-        winner, winPrice = getWinnerAndPrice(bidders, marketPrice)
-        if winner is not None:
+            b.setBid(seller.startPrice, seller.itemType) #make all bids
+        marketPrice = sum(b.bid for b in bidders) / len(bidders) #calculate market price
+        winner, winPrice = getWinnerAndPrice(bidders, marketPrice) #get the winning buyer and what they need to pay
+        if winner is not None: #if there's a winner, record the price
             winner.lastWin = winPrice
+            seller.lastWin = winPrice
             win = True            
-        printAuctionResults(bidders, seller, marketPrice, win)
+        printAuctionResults(bidders, seller, marketPrice, win) #print the results for this auction
         auctionCount += 1
         if win:
-            return [b for b in bidders if b is not winner]
+            return [b for b in bidders if b is not winner] #winner is removed from list
         else:
             return bidders
 
@@ -116,11 +131,14 @@ def printAuctionResults(bidders, seller, marketPrice, win):
         print("This auction had no winner.")
         
 
+#start of program run
 
 M = askInput("How many item types? ")
 K = askInput("How many sellers? ")
 N = askInput("How many buyers? ", K)
 R = askInput("How many auction rounds? ")
+E = askInput("What is the penalty factor? ", 0, 1)
 Smax = askInput("What is the universal maximum starting price? ")
+PureCommitment = askBool("Is pure commitment used? ")
 createAllObjects()
 runAllRounds()
