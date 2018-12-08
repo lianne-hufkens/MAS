@@ -1,5 +1,8 @@
-import random
+import random, re
 from tabulate import tabulate
+import seaborn
+import matplotlib.pyplot as plt
+import numpy as np
 
 #Number of item types M
 #Number of sellers K
@@ -14,27 +17,73 @@ roundCount = 1
 auctionCount = 1
 
 class Buyer:
-    bidFactors = None
-    bid = None
-    lastWin = None
     def __init__(self, ID):
-        self.ID = ID
+        self.bid = None
         self.bidFactors = [random.uniform(1,5) for t in range(M)] #a seperate factor for each item type
+        self.profit = []
+        self.auctionCount = 0
+        self.auctionWin = 0
+        self.auctionCancel = 0
+        self.ID = ID
+        self.sellerOfLastWin = None
+        self.profitOfLastWin = 0
+        self.priceOfLastWin = 0
     def setBid(self, startPrice, itemType):
-        self.bid = self.bidFactors[itemType] * startPrice
+        global E, sellers
+        self.bid = 0 #set bid to zero, will change if a bid is made
+        if PureCommit or self.sellerOfLastWin is None: #just bid
+            self.bid = self.bidFactors[itemType] * startPrice
+        elif not PureCommit and self.sellerOfLastWin is not None:
+            #if an auction is already won this round
+            #see if a bigger profit is to be had
+            penaltyFee = self.priceOfLastWin * E
+            newProfit = (self.bidFactors[itemType] * startPrice) - penaltyFee
+            if newProfit > self.priceOfLastWin:
+                self.auctionCancel += 1
+                self.auctionWin -= 1
+                self.sellerOfLastWin.cancelBuy(penaltyFee) #pay fee
+                self.profit[self.profit.index(self.profitOfLastWin)] = -penaltyFee #mark fee payment as loss
+                self.bid = self.bidFactors[itemType] * startPrice #make bid
+                self.resetLastWin()
+    def resetLastWin(self):
+        self.sellerOfLastWin = None
+        self.profitOfLastWin = 0
+        self.priceOfLastWin = 0
+    def recordWin(self, winPrice, marketPrice, seller=None):
+        profit = marketPrice - winPrice
+        self.profit.append(profit)
+        self.auctionWin += 1
+        if not PureCommit:
+            self.sellerOfLastWin = seller
+            self.profitOfLastWin = profit
+            self.priceOfLastWin = winPrice
+    def recordLoss(self):
+        self.profit.append(0)
 
 class Seller:
-    itemType = None
-    startPrice = None
-    lastWin = None
     def __init__(self, ID):
+        self.itemType = None
+        self.startPrice = None
+        self.profit = []
+        self.auctionCount = 0
+        self.auctionSell = 0
+        self.auctionCancel = 0
         self.ID = ID
     def setStartingPrice(self):
-        self.startPrice = random.randint(1, Smax) #maybe turn this into float?
+        #self.startPrice = random.randint(1, Smax) #maybe turn this into float?
+        self.startPrice = round(random.uniform(1, Smax), 2) #float with 2 decimals
     def setItemType(self):
         global M
         self.itemType = random.randint(0, M-1)
-
+    def recordSell(self, winPrice):
+        self.profit.append(winPrice)
+        self.auctionSell += 1
+    def recordUnsold(self):
+        self.profit.append(0)
+    def cancelBuy(self, fee):
+        self.profit[-1] = fee #change last buy to fee
+        self.auctionCancel += 1
+        self.auctionSell -= 1
 
 def askInput(message, lowBound=None, highBound=None):
     if lowBound is None:
@@ -43,9 +92,11 @@ def askInput(message, lowBound=None, highBound=None):
         highBound = 100
     while True:
         a = input(message)
-        if a is not "":
-            if a.isdigit() and int(a) > lowBound and int(a) <= highBound:
+        if a is not "" and re.match("^[0-9]+\.?[0-9]?$", a): #check for int or float
+            if isinstance(lowBound, int) and int(a) > lowBound and int(a) <= highBound:
                 return int(a)
+            elif isinstance(lowBound, float) and float(a) > lowBound and float(a) <= highBound:
+                return float(a)
             
 def askBool(message):
     while True:
@@ -53,9 +104,7 @@ def askBool(message):
         if a is not "":
             if a.lower() in ["y", "yes", "t", "tr", "true", "1"]:
                 return True
-            else:
-                return False
-
+        return False
 
 def createAllObjects(): #create all buyers and sellers
     global buyers, sellers
@@ -68,16 +117,19 @@ def sortBidders(bidders):
 def getWinnerAndPrice(bidders, marketPrice): #get the winning bidder and the price they must pay
     biddersLeft = [b for b in bidders if b.bid < marketPrice]
     biddersLeft = sortBidders(biddersLeft)
-    if len(biddersLeft) > 1:
-        return biddersLeft[0], biddersLeft[1].bid
-    elif len(biddersLeft) == 1:
-        return biddersLeft[0], biddersLeft[0].bid
+    if len(biddersLeft) > 1: #if at least two bids are below market price
+        return biddersLeft[0], biddersLeft[1].bid #second bid becomes price
+    elif len(biddersLeft) == 1: #else
+        return biddersLeft[0], biddersLeft[0].bid #winning bid becomes price
     else:
         return None, None
 
 def runAllRounds():
     for r in range(R):
         runRound()
+        if not PureCommit:
+            for b in buyers:
+                b.resetLastWin()
 
 def runRound():
     global buyers, sellers, roundCount, auctionCount
@@ -87,7 +139,8 @@ def runRound():
     random.shuffle(roundOrder) #to get the turn order for the sellers
     participatingBuyers = [b for b in buyers] #all buyers participate at first
     for o in roundOrder:
-         participatingBuyers = runAuction(sellers[o], participatingBuyers) #run an auction
+        participatingBuyers = runAuction(sellers[o], participatingBuyers) #run an auction
+             
     auctionCount = 1
     roundCount += 1
 
@@ -100,16 +153,30 @@ def runAuction(seller, bidders):
             b.setBid(seller.startPrice, seller.itemType) #make all bids
         marketPrice = sum(b.bid for b in bidders) / len(bidders) #calculate market price
         winner, winPrice = getWinnerAndPrice(bidders, marketPrice) #get the winning buyer and what they need to pay
-        if winner is not None: #if there's a winner, record the price
-            winner.lastWin = winPrice
-            seller.lastWin = winPrice
-            win = True            
-        printAuctionResults(bidders, seller, marketPrice, win) #print the results for this auction
+        recordParticipation(bidders, seller, marketPrice, winner, winPrice)
+        printAuctionResults(bidders, seller, marketPrice, (winner is not None)) #print the results for this auction
         auctionCount += 1
-        if win:
+        if winner is not None and PureCommit:
             return [b for b in bidders if b is not winner] #winner is removed from list
-        else:
+        else: #leveled commit has all buyers participate again
             return bidders
+        
+def recordParticipation(bidders, seller, marketPrice, winner=None, winPrice=None):
+    global buyers
+    
+    for b in buyers: #deal with buyers
+        if b in bidders:
+            b.auctionCount += 1 
+        if b is winner: #if there's a winner, record the profits
+            b.recordWin(winPrice, marketPrice, seller)
+        else:
+            b.recordLoss()
+    #deal with sellers
+    seller.auctionCount += 1
+    if winner is not None:
+         seller.recordSell(winPrice)
+    else: #the item goes unsold
+        seller.recordUnsold()
 
 def printAuctionResults(bidders, seller, marketPrice, win):
     s1 = "Round {} auction {}".format(roundCount, auctionCount)
@@ -129,16 +196,61 @@ def printAuctionResults(bidders, seller, marketPrice, win):
     print(tabulate(data, headers=['Buyer #', 'Bid value'], tablefmt="fancy_grid", stralign="center"))
     if not win:
         print("This auction had no winner.")
-        
+
+def plotProfits():
+    global sellers, buyers
+
+    sd = np.array([[p for p in s.profit] for s in sellers]).T
+    sc = np.array([np.cumsum(s.profit, dtype=float) for s in sellers]).T
+    bd = np.array([[q for q in b.profit] for b in buyers]).T
+    bc = np.array([np.cumsum(b.profit, dtype=float) for b in buyers]).T
+
+    sellerPalette = seaborn.husl_palette(len(sellers), l=.5)
+    buyerPalette = seaborn.husl_palette(len(buyers), h=.3, l=0.7)
+
+    xTickRangeS = [_ for _ in range(R)]
+    xTickLabelsS = [_ for _ in range(1,R+1)]
+    xTickRangeB = [_ for _ in range(R*K)]
+    xTickLabelsB = ["R{}\nA{}".format(int(a/K)+1, (a%K)+1) for a in range(R*K)]
+
+    plt.style.use("seaborn-darkgrid")
+    if PureCommit:
+        c = "Pure"
+    else:
+        c = "E:"+str(E)+", Leveled"
+    plt.suptitle("M:{}, K:{}, N:{}, R:{}, {} Commitment".format(M,K,N,R,c))
+    plt.subplot(2,2,1)
+    plt.title("Seller profits per round")
+    ax = seaborn.lineplot(data=sd, dashes=False, palette=sellerPalette)
+    plt.xticks(xTickRangeS)
+    ax.set_xticklabels(xTickLabelsS)
+    plt.subplot(2,2,2)
+    plt.title("Seller profits cumulative")
+    ax = seaborn.lineplot(data=sc, dashes=False, palette=sellerPalette)
+    plt.xticks(xTickRangeS)
+    ax.set_xticklabels(xTickLabelsS)
+    plt.subplot(2,2,3)
+    plt.title("Buyer profits per auction")
+    ax = seaborn.lineplot(data=bd, dashes=False, palette=buyerPalette)
+    plt.xticks(xTickRangeB)
+    ax.set_xticklabels(xTickLabelsB)
+    plt.subplot(2,2,4)
+    plt.title("Buyer profits cumulative")
+    ax = seaborn.lineplot(data=bc, dashes=False, palette=buyerPalette)
+    plt.xticks(xTickRangeB)
+    ax.set_xticklabels(xTickLabelsB)
+    plt.show()
 
 #start of program run
 
-M = askInput("How many item types? ")
+M = askInput("How many item types? ", 1)
 K = askInput("How many sellers? ")
 N = askInput("How many buyers? ", K)
 R = askInput("How many auction rounds? ")
-E = askInput("What is the penalty factor? ", 0, 1)
 Smax = askInput("What is the universal maximum starting price? ")
-PureCommitment = askBool("Is pure commitment used? ")
+PureCommit = askBool("Is pure commitment used? [default: no] ")
+if not PureCommit:
+    E = askInput("What is the penalty factor? ", 0.0, 1.0)
 createAllObjects()
 runAllRounds()
+plotProfits()
