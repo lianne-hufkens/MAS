@@ -21,6 +21,7 @@ class Buyer:
     def __init__(self, ID):
         self.bid = None
         self.bidFactors = [random.uniform(Bmin,Bmax) for t in range(K)] #a seperate factor for each seller
+        self.bidFactorHistory = []
         self.profit = []
         self.auctionCount = 0
         self.auctionWin = 0
@@ -32,6 +33,8 @@ class Buyer:
     def setBid(self, startPrice, sellerID):
         self.bid = self.bidFactors[sellerID] * startPrice
     def recordWin(self, record):
+        self.auctionCount += 1
+        self.bidFactorHistory.append(self.bidFactors)
         self.bidFactors[record.seller.ID] *= self.Dup
         self.profit.append(record.getProfit())
         self.auctionWin += 1
@@ -59,7 +62,9 @@ class Buyer:
         record.setCancelled() #mark this buy as cancelled
         self.auctionsWonInThisRound.remove(record) #remove from list
     def recordLoss(self, record):
+        self.auctionCount += 1
         self.profit.append(0)
+        self.bidFactorHistory.append(self.bidFactors)
         self.bidFactors[record.seller.ID] *= self.Ddown
     def resetForRound(self):
         self.auctionsWonInThisRound = []
@@ -79,9 +84,11 @@ class Seller:
         global M
         self.itemType = random.randint(0, M-1)
     def recordSell(self, record):
+        self.auctionCount += 1
         self.profit.append(record.winPrice)
         self.auctionSell += 1
     def recordUnsold(self):
+        self.auctionCount += 1
         self.profit.append(0)
     def cancelSell(self, fee):
         self.profit[-1] = fee #change last buy to fee
@@ -257,6 +264,62 @@ def printAuctionResults():#bidders, seller, marketPrice, win):
     global records
     for r in records:
         r.printData() #print the results for the auctions
+        
+def plotBar():
+    global sellers, buyers
+
+    #prepare base palettes
+    sellerPalette = seaborn.husl_palette(len(sellers), l=.5)
+    buyerPalette = seaborn.husl_palette(len(buyers), h=.3, l=0.7)
+
+    #prepare tick labels
+    xTickLabelsBuyer = ["Buyer{}".format(int(a % N) + 1) for a in range(N)]
+    xTickLabelsSeller = ["Seller{}".format(int(a % K) + 1) for a in range(K)]
+    barWidth = 0.5
+    
+    plt.subplot(1, 2, 1)
+    plt.title("Items bought")
+    #prepare data
+    x = range(len(buyers))
+    y1 = np.array([b.auctionWin for b in buyers])
+    if not PureCommit:
+        y2 = np.array([b.auctionCancel for b in buyers])
+        bottomColor = buyerPalette[0]
+        topColor = buyerPalette[1]
+    else:
+        bottomColor = buyerPalette        
+    #plot graph
+    p1 = plt.bar(x, y1, color=bottomColor, edgecolor='white', width=barWidth)
+    if not PureCommit:
+        p2 = plt.bar(x, y2, bottom=y1, color=topColor, edgecolor='white', width=barWidth)
+    #configure axes ticks and labels
+    plt.ylabel('Number of items')
+    plt.xticks(x, xTickLabelsBuyer, fontsize=6, rotation=30)
+    if not PureCommit:
+        plt.legend((p1[0], p2[0]), ('Bought', 'Cancelled' ))
+
+    plt.subplot(1, 2, 2)
+    plt.title("Items sold")
+    #prepare data
+    x = range(len(sellers))
+    y1 = np.array([s.auctionSell for s in sellers])
+    if not PureCommit:
+        y2 = np.array([s.auctionCount - s.auctionSell for s in sellers])
+        bottomColor = sellerPalette[0]
+        topColor = sellerPalette[1]
+    else:
+        bottomColor = sellerPalette
+    #plot graph
+    p1 = plt.bar(x, y1, color=bottomColor, edgecolor='white', width=barWidth)
+    if not PureCommit:
+        p2 = plt.bar(x, y2,bottom=y1, color=topColor, edgecolor='white', width=barWidth)
+    #configure axes ticks and labels
+    plt.ylabel('Number of items')
+    plt.xticks(x, xTickLabelsSeller, fontsize=6, rotation=30)
+    if not PureCommit:
+        plt.legend((p1[0], p2[0]), ('Sold', 'Cancelled' ))
+
+    plt.show()
 
 def plotProfits():
     global sellers, buyers, records
@@ -375,3 +438,4 @@ createAllObjects()
 runAllRounds()
 printAuctionResults()
 plotProfits()
+plotBar()
