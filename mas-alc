@@ -283,47 +283,76 @@ def plotProfits():
     xTickRangeS = [_ for _ in range(R)]
     xTickLabelsS = [_ for _ in range(1,R+1)]
     xTickRangeB = [_ for _ in range(R*K)]
-    xTickLabelsB = ["R{}\nA{}".format(int(a/K)+1, (a%K)+1) for a in range(R*K)]
+    #xTickLabelsB = ["R{}\nA{}".format(int(a/K)+1, (a%K)+1) for a in range(R*K)]
+    xTickLabelsB = ["R{}".format(i) for i in range(1,R+1)]
 
+    #custom major tick locations
+    bPos = [i for i in range(R*K) if i%K == 0]
+    
     plt.style.use("seaborn-darkgrid")
-
+    seaborn.set(rc={"xtick.bottom" : True, "xtick.major.size": 4, "xtick.minor.size": 2})#, "ytick.left" : True})
+    plt.subplots_adjust(hspace = 0.4)
+    
     #create main title with parameter info
     if PureCommit:
         c = "Pure"
     else:
         c = "E:"+str(E)+", Leveled"
     plt.suptitle("M:{}, K:{}, N:{}, R:{}, {} Commitment".format(M,K,N,R,c))
-    plt.subplot(2,2,1)
-    plt.title("Seller profits per round")
-    
+
     #start of graph plotting (rendering)
+    
+    plt.subplot(2,2,1)
+    plt.title("Seller profits per round", weight='semibold')
     ax = seaborn.lineplot(data=sd, dashes=False, palette=sellerPaletteM)
+    #configure ticks
     plt.xticks(xTickRangeS)
     ax.set_xticklabels(xTickLabelsS)
+    #modify legend
     handles, labels = ax.get_legend_handles_labels()
     labels[-1] = "AVG Market Price"
     ax.legend(handles, labels)
+    #add axes labels
+    plt.xlabel('Rounds')
+    plt.ylabel('Profits')
     
     plt.subplot(2,2,2)
-    plt.title("Seller profits cumulative")
+    plt.title("Seller profits cumulative", weight='semibold')
     ax = seaborn.lineplot(data=sc, dashes=False, palette=sellerPalette)
+    #configure ticks
     plt.xticks(xTickRangeS)
     ax.set_xticklabels(xTickLabelsS)
+    #add axes labels
+    plt.xlabel('Rounds')
+    plt.ylabel('Profits')
     
     plt.subplot(2,2,3)
-    plt.title("Buyer profits per auction")
+    plt.title("Buyer profits per auction", weight='semibold')
     ax = seaborn.lineplot(data=bd, dashes=False, palette=buyerPaletteM)
+    #configure ticks
     plt.xticks(xTickRangeB)
+    ax.get_xaxis().set_minor_locator(mpl.ticker.AutoMinorLocator())
+    ax.get_xaxis().set_major_locator(mpl.ticker.FixedLocator(bPos))
     ax.set_xticklabels(xTickLabelsB)
+    #modify legend
     handles, labels = ax.get_legend_handles_labels()
     labels[-1] = "Market Price"
     ax.legend(handles, labels)
+    #add axes labels
+    plt.xlabel('Auctions')
+    plt.ylabel('Profits')
 
     plt.subplot(2,2,4)
-    plt.title("Buyer profits cumulative")
+    plt.title("Buyer profits cumulative", weight='semibold')
     ax = seaborn.lineplot(data=bc, dashes=False, palette=buyerPalette)
+    #configure ticks
     plt.xticks(xTickRangeB)
+    ax.get_xaxis().set_minor_locator(mpl.ticker.AutoMinorLocator())
+    ax.get_xaxis().set_major_locator(mpl.ticker.FixedLocator(bPos))
     ax.set_xticklabels(xTickLabelsB)
+    #add axes labels
+    plt.xlabel('Auctions')
+    plt.ylabel('Profits')
     
     plt.show()
 
