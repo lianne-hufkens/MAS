@@ -35,7 +35,7 @@ class Buyer:
     def recordWin(self, record):
         self.auctionCount += 1
         self.bidFactorHistory.append(self.bidFactors)
-        self.bidFactors[record.seller.ID] *= self.Dup
+        self.bidFactors[record.seller.ID] *= self.Ddown #regardless of strategy used
         self.profit.append(record.getProfit())
         self.auctionWin += 1
         if not PureCommit:
@@ -65,10 +65,13 @@ class Buyer:
         self.auctionCount += 1
         self.profit.append(0)
         self.bidFactorHistory.append(self.bidFactors)
-        self.bidFactors[record.seller.ID] *= self.Ddown
+        if newStrategy and (record.marketPrice - self.bid) > 0: #if the bid was below market price
+            self.bidFactors[record.seller.ID] *= self.Dup
+        else:
+            self.bidFactors[record.seller.ID] *= self.Ddown
     def resetForRound(self):
         self.auctionsWonInThisRound = []
-
+        
 class Seller:
     def __init__(self, ID):
         self.itemType = None
@@ -361,7 +364,12 @@ def plotProfits():
         c = "Pure"
     else:
         c = "E:"+str(E)+", Leveled"
-    plt.suptitle("M:{}, K:{}, N:{}, R:{}, {} Commitment".format(M,K,N,R,c))
+    if newStrategy:
+        s = "Old"
+    else:
+        s = "New"
+    plt.suptitle("M:{}, K:{}, N:{}, R:{}, {} Commitment, Dup:({},{}), Ddown:({},{}), Bfactor:({},{}), {} Strategy".format(M,K,N,R,c,DUmin,DUmax,DDmin,DDmax,Bmin,Bmax,s))
+
 
     #start of graph plotting (rendering)
     
@@ -422,7 +430,7 @@ def plotProfits():
 
 
 #start of program run
-
+newStrategy = True
 M = askInput("How many item types? [x > 1] ", 1)
 K = askInput("How many sellers? [x > 1] ")
 N = askInput("How many buyers? [x > sellers] ", K)
