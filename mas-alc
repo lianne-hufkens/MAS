@@ -1,6 +1,7 @@
 import random, re
 from tabulate import tabulate
 import seaborn
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -16,6 +17,7 @@ import numpy as np
 roundCount = 1
 auctionCount = 1
 records = []
+
 
 class Buyer:
     def __init__(self, ID):
@@ -69,9 +71,11 @@ class Buyer:
             self.bidFactors[record.seller.ID] *= self.Dup
         else:
             self.bidFactors[record.seller.ID] *= self.Ddown
+            
     def resetForRound(self):
         self.auctionsWonInThisRound = []
-        
+
+
 class Seller:
     def __init__(self, ID):
         self.itemType = None
@@ -142,7 +146,9 @@ class AuctionRecord:
         elif self.cancelled:
             print("Buyer {} cancelled their purchase.".format(self.winner.ID))
         else:
-            print("Bidder {} won the auction and paid {}.".format(self.winner.ID, self.winPrice)
+            print("Bidder {} won the auction and paid {}.".format(self.winner.ID, self.winPrice))
+
+        
 
 def askInput(message, lowBound=None, highBound=None):
     if lowBound is None:
@@ -189,6 +195,8 @@ def askRange(message, minN=None, maxN=None):
                 elif minN and maxN and p[1] >= minN and p[0] <= maxN: #the range must fall within the boundaries
                     break
     return p[0], p[1] #output min, max
+            
+
 
 def createAllObjects(): #create all buyers and sellers
     global buyers, sellers
@@ -267,7 +275,7 @@ def printAuctionResults():#bidders, seller, marketPrice, win):
     global records
     for r in records:
         r.printData() #print the results for the auctions
-        
+
 def plotBar():
     global sellers, buyers
 
@@ -322,7 +330,7 @@ def plotBar():
     if not PureCommit:
         plt.legend((p1[0], p2[0]), ('Sold', 'Cancelled' ))
 
-    plt.show()
+    plt.show()    
 
 def plotProfits():
     global sellers, buyers, records
@@ -369,7 +377,6 @@ def plotProfits():
     else:
         s = "Old"
     plt.suptitle("M:{}, K:{}, N:{}, R:{}, {} Commitment, Dup:({},{}), Ddown:({},{}), Bfactor:({},{}), {} Strategy".format(M,K,N,R,c,DUmin,DUmax,DDmin,DDmax,Bmin,Bmax,s))
-
 
     #start of graph plotting (rendering)
     
@@ -426,24 +433,42 @@ def plotProfits():
     plt.ylabel('Profits')
     
     plt.show()
-
-
-
+    
 #start of program run
-newStrategy = True
-M = askInput("How many item types? [x > 1] ", 1)
-K = askInput("How many sellers? [x > 1] ")
-N = askInput("How many buyers? [x > sellers] ", K)
-R = askInput("How many auction rounds? [x > 0] ")
-Smax = askInput("What is the universal maximum starting price? [x > 0] ", 0.0, 1000)
-PureCommit = askBool("Is pure commitment used? [default: no] ")
-if not PureCommit:
-    E = askInput("What is the penalty factor? [0 < x < 1] ", 0.0, 1.0)
-DUmin, DUmax = askRange("Enter the Delta Up range, separated by a space or comma [x >= 1]: ", minN=1)
-DDmin, DDmax = askRange("Enter the Delta Down range, separated by a space or comma [0 < x <= 1]: ", minN=0, maxN=1)
-Bmin, Bmax = askRange("Enter the Bidding Factor range, separated by a space or comma [x > 0]: ", minN=0)
+
+debug = True
+if not debug:
+    M = askInput("How many item types? [x > 1] ", 1)
+    K = askInput("How many sellers? [x > 1] ")
+    N = askInput("How many buyers? [x > sellers] ", K)
+    R = askInput("How many auction rounds? [x > 0] ")
+    Smax = askInput("What is the universal maximum starting price? [x > 0] ", 0.0, 1000)
+    PureCommit = askBool("Is pure commitment used? [default: no] ")
+    if not PureCommit:
+        E = askInput("What is the penalty factor? [0 < x <= 1] ", 0.0, 1.0)
+    DUmin, DUmax = askRange("Enter the Delta Up range, separated by a space or comma [x >= 1]: ", minN=1)
+    DDmin, DDmax = askRange("Enter the Delta Down range, separated by a space or comma [0 < x <= 1]: ", minN=0, maxN=1)
+    Bmin, Bmax = askRange("Enter the Bidding Factor range, separated by a space or comma [x > 0]: ", minN=0)
+else:
+    M = 15
+    K = 1
+    N = 20
+    R = 15
+    Smax = 10
+    PureCommit = True
+    E = 0.9
+    DUmin = 2
+    DUmax = 3
+    DDmin = 0.3
+    DDmax = 0.5
+    Bmin = 1
+    Bmax = 5
+newStrategy = False
+
 createAllObjects()
 runAllRounds()
 printAuctionResults()
+print([r.marketPrice for r in records])
+
 plotProfits()
 plotBar()
