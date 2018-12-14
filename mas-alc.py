@@ -18,7 +18,6 @@ roundCount = 1
 auctionCount = 1
 records = []
 
-
 class Buyer:
     def __init__(self, ID):
         self.bid = None
@@ -67,14 +66,13 @@ class Buyer:
         self.auctionCount += 1
         self.profit.append(0)
         self.bidFactorHistory.append(self.bidFactors)
-        if newStrategy and (record.marketPrice - self.bid) > 0: #if the bid was below market price
+        if not newStrategy or (record.marketPrice - self.bid) > 0: #if the bid was below market price or using the old strategy
             self.bidFactors[record.seller.ID] *= self.Dup
         else:
             self.bidFactors[record.seller.ID] *= self.Ddown
             
     def resetForRound(self):
         self.auctionsWonInThisRound = []
-
 
 class Seller:
     def __init__(self, ID):
@@ -148,8 +146,6 @@ class AuctionRecord:
         else:
             print("Bidder {} won the auction and paid {}.".format(self.winner.ID, self.winPrice))
 
-        
-
 def askInput(message, lowBound=None, highBound=None):
     if lowBound is None:
         lowBound = 0
@@ -195,8 +191,6 @@ def askRange(message, minN=None, maxN=None):
                 elif minN and maxN and p[1] >= minN and p[0] <= maxN: #the range must fall within the boundaries
                     break
     return p[0], p[1] #output min, max
-            
-
 
 def createAllObjects(): #create all buyers and sellers
     global buyers, sellers
@@ -433,9 +427,8 @@ def plotProfits():
     plt.ylabel('Profits')
     
     plt.show()
-    
-#start of program run
 
+#start of program run
 debug = True
 if not debug:
     M = askInput("How many item types? [x > 1] ", 1)
@@ -449,6 +442,7 @@ if not debug:
     DUmin, DUmax = askRange("Enter the Delta Up range, separated by a space or comma [x >= 1]: ", minN=1)
     DDmin, DDmax = askRange("Enter the Delta Down range, separated by a space or comma [0 < x <= 1]: ", minN=0, maxN=1)
     Bmin, Bmax = askRange("Enter the Bidding Factor range, separated by a space or comma [x > 0]: ", minN=0)
+    newStrategy = askBool("Is the new bidding strategy used? [default: no] ")
 else:
     M = 15
     K = 1
@@ -463,12 +457,10 @@ else:
     DDmax = 0.5
     Bmin = 1
     Bmax = 5
-newStrategy = False
+    newStrategy = False
 
 createAllObjects()
 runAllRounds()
 printAuctionResults()
-print([r.marketPrice for r in records])
-
 plotProfits()
 plotBar()
