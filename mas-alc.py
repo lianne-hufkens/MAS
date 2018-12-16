@@ -196,6 +196,8 @@ def createAllObjects(): #create all buyers and sellers
     global buyers, sellers
     buyers = [Buyer(b) for b in range(N)]
     sellers = [Seller(s) for s in range(K)]
+    for s in sellers: #sellers pick their item type
+        s.setItemType() 
 
 def sortBidders(bidders):
     return sorted(bidders, key=lambda x: x.bid, reverse=True)
@@ -211,9 +213,6 @@ def getWinnerAndPrice(bidders, marketPrice): #get the winning bidder and the pri
         return None, None
 
 def runAllRounds():
-    global sellers
-    for s in sellers: #sellers pick their item type
-        s.setItemType() 
     for r in range(R):
         runRound()
         if not PureCommit:
@@ -227,7 +226,6 @@ def runRound():
     participatingBuyers = [b for b in buyers] #all buyers participate at first
     for o in roundOrder:
         participatingBuyers = runAuction(sellers[o], participatingBuyers) #run an auction
-             
     auctionCount = 1
     roundCount += 1
 
@@ -328,7 +326,6 @@ def plotBar():
 
 def plotProfits():
     global sellers, buyers, records
-
     #create the data structures
     sd = np.array([[p for p in s.profit] for s in sellers]).T
     sc = np.array([np.cumsum(s.profit, dtype=float) for s in sellers]).T
@@ -429,6 +426,7 @@ def plotProfits():
     plt.show()
 
 #start of program run
+
 debug = True
 if not debug:
     M = askInput("How many item types? [x > 1] ", 1)
@@ -445,11 +443,11 @@ if not debug:
     newStrategy = askBool("Is the new bidding strategy used? [default: no] ")
 else:
     M = 15
-    K = 1
-    N = 20
+    K = 4
+    N = 5
     R = 15
     Smax = 10
-    PureCommit = True
+    PureCommit = False
     E = 0.9
     DUmin = 2
     DUmax = 3
@@ -457,7 +455,7 @@ else:
     DDmax = 0.5
     Bmin = 1
     Bmax = 5
-    newStrategy = False
+    newStrategy = True
 
 createAllObjects()
 runAllRounds()
