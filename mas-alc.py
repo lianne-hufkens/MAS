@@ -426,8 +426,7 @@ def plotProfits():
     plt.show()
 
 #start of program run
-
-debug = True
+debug = False
 if not debug:
     M = askInput("How many item types? [x > 1] ", 1)
     K = askInput("How many sellers? [x > 1] ")
